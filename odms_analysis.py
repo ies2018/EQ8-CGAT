@@ -74,14 +74,17 @@ try:
     stop_pts = raw_input("Load previous stopping points? (y/n)? (Default = n)? ")
 except ValueError:
     stop_pts = "n"
-    
+
+i_prev, j_prev = 0, 0  ### set default values 
+   
 if stop_pts == "y":
     with open (stop_filename, 'rb') as F:
         L2 = pickle.load(F)
-            
-#### assign previous stopping point values        
-i_prev, j_prev = L2
-
+        
+        #### assign previous stopping point values        
+        i_prev, j_prev = L2
+        
+############## check to see if there is a different start point
 try:
     i_start =  int(raw_input("What Reg ID (i) to start at? (default = " + str(i_prev) + ")? "))
 except ValueError:
@@ -99,12 +102,12 @@ except ValueError:
 
 break_err = 0
 
-for i in range(i_start, 10):
+for i in range(i_start, len_app_regs):
     
     if break_err == 1:
         break
     else:
-        for j in range(j_start, 5):
+        for j in range(j_start, len_odms):
             print "\n", i,"Source:", app_regs.TitleEn[i]
             print "(Reg ID: " + str(app_regs.ID[i]) + ")Text:", app_regs.TextEng[i]
             print "\nSection:", odms.Section[j]
