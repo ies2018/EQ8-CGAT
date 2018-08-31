@@ -31,20 +31,26 @@ stop_filename = 'stop_file_points.txt'
 if not 'regs' in globals():
     regs = pd.read_excel("tb_reg_master.xlsx")
     len_regs = len(regs)
-    print 'tb_reg_master.xlsx loaded'
+    print 'tb_reg_master.xlsx loaded',
 
-############################################
 ### find applicable regulations
 if not 'app_regs' in globals():
     app_regs = regs[(regs.Applicable == True) & (regs.Header == False) & (regs.Definition == False)].reset_index()
     len_app_regs = len(app_regs)
+    print'# of applicable regs = ', len_app_regs
 
 ############################################
 ### load ODMS functions
 if not 'odms' in globals():
     odms = pd.read_excel("tb_odms.xlsx")
     len_odms = len(odms)
-    print 'tb_odms.xlsx loaded'
+    print 'tb_odms.xlsx loaded',     
+    
+### find applicable odms functions
+if not 'app_odms' in globals():
+    app_odms = odms[(odms.APP == 1)].reset_index()
+    len_app_odms = len(app_odms)
+    print'# of applicable regs = ', len_app_odms
 
 ############################################    
 ######## make or load odms analysis matrix
@@ -57,18 +63,19 @@ if not 'odms_analysis' in globals():
         
     ##### make a new ODMS analysis matrix (all zeroes) if yes
     if odms_load == "y":
-        odms_analysis = np.zeros((len_regs,len_odms), dtype=int)
+        odms_analysis = np.zeros((len_odms, len_regs), dtype=int) ## numpy matrix!
         
         #### reset stopping points if a new matrix is created
         L2 = [0,0] 
         with open(stop_filename, 'wb') as F:
             pickle.dump(L2, F)
     
-    ##### load existing matrix if no
+    ##### load existing matrix if 'no'
     else:    
-        odms_analysis = pd.read_excel(odms_filename)
+        odms_analysis = pd.read_excel(odms_filename).values  ## must be a numpy matrix!
         print '\n' + odms_filename + ' loaded'
-        
+
+#******************************************************        
 ############### load previous stopping points
 try:
     stop_pts = raw_input("Load previous stopping points? (y/n)? (Default = n)? ")
@@ -83,69 +90,89 @@ if stop_pts == "y":
         
         #### assign previous stopping point values        
         i_prev, j_prev = L2
-        
+
+################################################################        
 ############## check to see if there is a different start point
+
 try:
-    i_start =  int(raw_input("What Reg ID (i) to start at? (default = " + str(i_prev) + ")? "))
+    i_start =  int(raw_input("What ODMS ID (i) to start at? (default = " + str(i_prev) + ")? "))
 except ValueError:
     i_start =  i_prev
 
 try:
-    j_start =  int(raw_input("What ODMS ID (j) to start at? (default = " + str(j_prev) + ")? "))
+    j_start =  int(raw_input("What Reg ID (j) to start at? (default = " + str(j_prev) + ")? "))
 except ValueError:
     j_start =  j_prev
 
 ################################################################
-
 ### set counter to check if a break is called
 ### breaks from loop occur if a number > 2 is typed
 
 break_err = 0
 
-for i in range(i_start, len_app_regs):
+for i in range(i_start, len_app_odms):
     
+    i_app = app_odms.ID[i]-1  ## set odms index to match applicable odms function
     if break_err == 1:
         break
+    
     else:
-        for j in range(j_start, len_odms):
-            print "\n", i,"Source:", app_regs.TitleEn[i]
-            print "(Reg ID: " + str(app_regs.ID[i]) + ")Text:", app_regs.TextEng[i]
-            print "\nSection:", odms.Section[j]
-            print j,"ODMS:", odms.comments[j]
+        counter = 0  ### set up counter
+        for j in range(j_start, len_app_regs):
+            j_app = app_regs.ID[j]-1  ## set regs index to match applicable regs
             
-            i_app = app_regs.ID[i]-1  ## set index to match applicable regs
+            ### print element information and get element status
             
+            print "\n", j, "Section:", app_odms.Section[i]
+            print "(Func ID: " + str(app_odms.ID[i]) + ") ODMS:", app_odms.comments[i]
+            print "Current value is", odms_analysis[i_app,j_app]
+            
+            if counter == 0:
+                print "\n", i, "************* Regulation Source:", app_regs.TitleEn[j]
+                
+            print "\n(Reg ID: " + str(app_regs.ID[j]) + ")Text:", app_regs.TextEng[j]
+
+            #*****************************************************
+            ##### assign odms function analysis value
             try:
-                temp_odms =  int(raw_input("N/A-0, Indirect-1, or Direct-2 (default = 0 N/A)? "))
+                temp_odms =  int(raw_input("N/A-0, Indirect-1, or Direct-2 Ignore entire function-3 (default = 0 N/A)? "))
             except ValueError:
                 temp_odms =  0
             
-            ### if input is greater than 2, break
-            if temp_odms > 2:
+            ### if input = 3, break only the regs and go to the next odms function
+            if temp_odms == 3:
+                break
+            
+            ### if input > 3, break completely 
+            if temp_odms > 3:
                 break_err = 1
                 break
             
             else:
-                if odms_analysis[i_app,j] > 0:      ### check to see if there is a value
-                    print'\nValue already exists (' + str(odms_analysis[i_app,j]) + ')'
+                if odms_analysis[i_app,j_app] > 0:      ### check to see if there is a value
+                    print'\nValue already exists (' + str(odms_analysis[i_app,j_app]) + ')'
                     
                     try:
                         overwrite = raw_input("Overwrite value (y/n)? (Default = n)? ")
                     except ValueError:
                         overwrite = "n"  ### if no value (other than 0) update the element
                         
-                    if overwrite == 'n':
-                        odms_analysis[i_app,j] = temp_odms
+                    if overwrite == 'y':
+                        odms_analysis[i_app,j_app] = temp_odms
                         
                 else:
-                    odms_analysis[i_app,j] = temp_odms
+                    odms_analysis[i_app,j_app] = temp_odms
+                                 
+            print'Value at Reg ID', app_regs.ID[j], 'and Func ID', app_odms.ID[i], ' set to ', odms_analysis[i_app,j_app]
             print'\n_________________________________'
+            
+            counter += 1  ### increment counter
             
         print '\n******** New Regulation element *********'
                          
 ####################################################################
 ######  write results to file
-print '\n Stopped at i =', i , 'and j =', j
+print '\n Stopped at i =', i-1 , 'and j =', j-1
 
 try:
     file_write = raw_input("Save ouput file (y/n)? (Default = n)? ")
@@ -164,7 +191,7 @@ try:
 except ValueError:
     file_write = "n"
     
-L = [i,j]
+L = [i-1,j-1]
 
 if file_write == "y":   
     with open(stop_filename, 'wb') as F:
